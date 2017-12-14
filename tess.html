@@ -1,0 +1,151 @@
+<html>
+<head>
+	<meta charset="UTF-8">
+	<title>Talos Sigil Tessellator</title>
+</head>
+<body>
+	<h1>Talos Sigil Tessellator</h1>
+	<h3>Inputs</h3>
+	Board Dimensions:<br>
+	<input type="number" min="3" max="10" value="4" id="width"> wide
+	 &times;
+	<input type="number" min="3" max="10" value="3" id="height"> high
+	<br><br>
+
+	<canvas id="piecesSignPost" width="170px" height="260px" style="border: 1px solid black;"></canvas>
+	<br><br>
+
+	Pieces: (e.g. AAB for 2 As and 1 B)<br>
+	<input pattern="[ABCDEFG]+" id="pieces" placeholder="e.g. DDF" value="ddf">
+	<input type="button" role="button" id="clear" value="Clear">
+	<br><br>
+
+	<input type="button" role="button" id="go" value="Solve">
+	<hr>
+	<h3>Outputs</h3>
+	<div id="canvasarea"></div>
+
+	<script src="draw.js"></script>
+	<script src="solve.js"></script>
+	<script>
+	"use strict";
+
+	String.prototype.count = function(letter) {
+		let counter = 0;
+
+		for (let i = 0; i < this.length; i++) {
+			if (this[i] == letter) {
+				counter++;
+			}
+		}
+		return counter;
+	};
+
+	(function(){
+		const canvas = document.getElementById("piecesSignPost");
+		const piecesField = document.getElementById("pieces");
+		const clearButton = document.getElementById("clear");
+		const goButton = document.getElementById("go");
+		const outputDiv = document.getElementById("canvasarea");
+
+		const context = canvas.getContext("2d");
+		context.font = "11px sans-serif";
+		const bounds = {};
+
+		context.fillText("A", 10, 20);
+		drawSigil(context, 'A', 30, 10, 10);
+		drawSigil(context, 'Ar', 80, 10, 10);
+		bounds['A'] = new Path2D(); bounds['A'].rect(10, 5, 70, 20); bounds['A'].rect(75, 5, 20, 50);
+
+		context.fillText("B", 10, 40);
+		drawSigil(context, 'B', 30, 30, 10);
+		bounds['B'] = new Path2D(); bounds['B'].rect(10, 25, 50, 20);
+
+		context.fillText("C", 10, 70);
+		drawSigil(context, 'C', 30, 60, 10);
+		drawSigil(context, 'Cr', 70, 60, 10);
+		drawSigil(context, 'Crr', 100, 60, 10);
+		drawSigil(context, 'Crrr', 140, 60, 10);
+		bounds['C'] = new Path2D(); bounds['C'].rect(10, 55, 160, 39);
+
+		context.fillText("D", 10, 110);
+		drawSigil(context, 'D', 30, 100, 10);
+		drawSigil(context, 'Dr', 70, 100, 10);
+		drawSigil(context, 'Drr', 100, 100, 10);
+		drawSigil(context, 'Drrr', 140, 100, 10);
+		bounds['D'] = new Path2D(); bounds['D'].rect(10, 95, 160, 39);
+
+		context.fillText("E", 10, 150);
+		drawSigil(context, 'E', 30, 140, 10);
+		drawSigil(context, 'Er', 70, 140, 10);
+		drawSigil(context, 'Err', 100, 140, 10);
+		drawSigil(context, 'Errr', 140, 140, 10);
+		bounds['E'] = new Path2D(); bounds['E'].rect(10, 135, 160, 39);
+
+		context.fillText("F", 10, 190);
+		drawSigil(context, 'F', 30, 180, 10);
+		drawSigil(context, 'Fr', 70, 180, 10);
+		bounds['F'] = new Path2D(); bounds['F'].rect(10, 175, 90, 39);
+
+		context.fillText("G", 10, 230);
+		drawSigil(context, 'G', 30, 220, 10);
+		drawSigil(context, 'Gr', 70, 220, 10);
+		bounds['G'] = new Path2D(); bounds['G'].rect(10, 215, 90, 39);
+
+		window.clickList = '';
+		canvas.addEventListener('mousedown', function(event) {
+			for (const type in bounds) {
+				if (context.isPointInPath(bounds[type], event.layerX, event.layerY)) {
+					window.clickList = window.clickList + (''+type);
+					piecesField.value = window.clickList;
+				}
+			}
+		}, false);
+
+		clearButton.addEventListener('click', function(event) {
+			window.clickList = '';
+			piecesField.value = window.clickList;
+		}, false);
+
+		goButton.addEventListener('click', function(event) {
+			const w = +document.getElementById("width").value;
+			const h = +document.getElementById("height").value;
+			const sigs = piecesField.value.toUpperCase();
+			const sigils = {};
+			for (const key of ['A', 'B', 'C', 'D', 'E', 'F', 'G']) {
+				const count = sigs.count(key);
+				if (count > 0) sigils[key] = count;
+			}
+			console.log('Finding fits for ' + piecesField.value.toUpperCase() + ' in a ' + w + ' by ' + h + ' grid.');
+			
+			const results = solve(sigils, w, h);
+			console.log(results);
+
+			if (results === null) {
+				outputDiv.innerText = 'No results.';
+			} else {
+				const canvasWidth = (w * 10 + 20);
+				const canvasHeight = (h * 10 + 20);
+				while (outputDiv.firstChild) {
+					outputDiv.removeChild(outputDiv.firstChild);
+				}
+				for (let i = 0; i < results.length; i++) {
+					const canvas = document.createElement("canvas");
+					outputDiv.appendChild(canvas);
+					canvas.width = canvasWidth;
+					canvas.height = canvasHeight;
+
+					const resCtx = canvas.getContext("2d");
+					resCtx.font = "11px sans-serif";
+					resCtx.fillText(''+(i+1), 0, 10);
+					for (const placement of results[i]) {
+					 	drawSigil(resCtx, placement.layout, placement.x * 10 + 10, placement.y * 10 + 10, 10);
+					}
+				}
+			}
+		}, false);
+	})();
+
+	</script>
+</body>
+</html>
